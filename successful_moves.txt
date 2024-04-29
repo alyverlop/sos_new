@@ -1,0 +1,9 @@
+Row: 0, Col: 0, Symbol: S, Color: Blue
+Row: 1, Col: 1, Symbol: S, Color: Red
+Row: 1, Col: 0, Symbol: O, Color: Blue
+Row: 2, Col: 0, Symbol: S, Color: Red
+Row: 0, Col: 2, Symbol: S, Color: Blue
+Row: 0, Col: 1, Symbol: S, Color: Red
+Row: 1, Col: 2, Symbol: O, Color: Blue
+Row: 2, Col: 1, Symbol: S, Color: Red
+Row: 2, Col: 2, Symbol: S, Color: Blue

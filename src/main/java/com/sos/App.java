@@ -9,25 +9,27 @@ import javafx.scene.layout.HBox;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 import javafx.scene.layout.VBox;
-import javafx.scene.control.Label;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.Random;
-import javafx.geometry.Insets;
 
 
 
 public class App extends Application {
     private SOSGame game;
     private Button[][] buttons;
-    private Button startButton;
     private boolean isSimpleGame;
+    private boolean recordGame;
     private ComboBox<String> gameModeComboBox;
     private TextField boardSizeField;
     private int check;
-    RadioButton selectedRedRadioButton;
-    RadioButton selectedBlueRadioButton;
-    RadioButton selectedRedPlayerRadioButton;
-    RadioButton selectedBluePlayerRadioButton;
+    ToggleGroup redPlayerToggleGroup = new ToggleGroup();
+    ToggleGroup bluePlayerToggleGroup = new ToggleGroup();
     char chosenCharacter;
+    CheckBox recordGameCheckbox;
 
     @Override
     public void start(Stage primaryStage) {
@@ -47,6 +49,8 @@ public class App extends Application {
 
         boardSizeField = new TextField("3");
 
+        recordGameCheckbox = new CheckBox("Record Game");
+
         Button startButton = new Button("Start Game");
         startButton.setOnAction(event -> {
             boolean gameStarted = startGame(primaryStage);
@@ -55,10 +59,7 @@ public class App extends Application {
                 start(primaryStage);
             }
         });
-
-        ToggleGroup redPlayerToggleGroup = new ToggleGroup();
-        ToggleGroup bluePlayerToggleGroup = new ToggleGroup();
-
+        
         // Create radio buttons for character selection
         RadioButton blueHumanRadioButton = new RadioButton("Human");
         RadioButton blueComputerRadioButton = new RadioButton("Computer");
@@ -97,8 +98,10 @@ public class App extends Application {
         initialDialogPane.addRow(1, new Label("Board Size:"), boardSizeField);
         initialDialogPane.addRow(2, new Label("Blue Player:"),bluePlayerOptions);
         initialDialogPane.addRow(3, new Label("Red Player:"),redPlayerOptions);
-        initialDialogPane.add(startButton, 1, 4);
-        initialDialogPane.add(errorLabel, 1, 5); // Add error label to the layout
+        initialDialogPane.add(recordGameCheckbox, 1, 4); // Add checkbox to the layout
+        initialDialogPane.add(startButton, 1, 6);
+        initialDialogPane.add(errorLabel, 1, 7); // Add error label to the layout
+    
 
         Scene initialDialogScene = new Scene(initialDialogPane, 350, 250);
         primaryStage.setScene(initialDialogScene);
@@ -116,8 +119,19 @@ public class App extends Application {
             isSimpleGame = false;
         }
 
-        
-    
+        if (recordGameCheckbox.isSelected()) {
+            recordGame = true;
+        } else {
+            recordGame = false;
+        }
+
+        RadioButton redPlayerRadioButton = (RadioButton) redPlayerToggleGroup.getSelectedToggle();
+        char redPlayerMode = redPlayerRadioButton.getText().charAt(0);
+
+        RadioButton bluePlayerRadioButton = (RadioButton) bluePlayerToggleGroup.getSelectedToggle();
+        char bluePlayerMode = bluePlayerRadioButton.getText().charAt(0);
+
+        System.out.println(bluePlayerMode + " " + redPlayerMode);
     
         int boardSize;
         boardSize = Integer.parseInt(boardSizeField.getText());
@@ -144,52 +158,170 @@ public class App extends Application {
         int[] player = {1}; // Define as an array of size 1
         player[0] = 1;
     
+        // Loop to create buttons
         for (int i = 0; i < game.getSize(); i++) {
             for (int j = 0; j < game.getSize(); j++) {
                 Button button = new Button("*");
                 button.setMinSize(50, 50);
-                int[] row ={i};
-                int[] col = {j};
+                buttons[i][j] = button; // Store the reference to the button
+                gridPane.add(button, j, i);
+            }
+        }
 
+        for (int i = 0; i < game.getSize(); i++) {
+            for (int j = 0; j < game.getSize(); j++) {
+                Button button = new Button("*");
+                button.setMinSize(50, 50);
+                int row = i;
+                int col = j;
 
-                selectedRedRadioButton = (RadioButton) redToggleGroup.getSelectedToggle();
-                selectedBlueRadioButton = (RadioButton) blueToggleGroup.getSelectedToggle();
-                if (player[0] % 2 == 0) {   
-                    chosenCharacter = selectedRedRadioButton.getText().charAt(0);
-                }
-                else {
-                    if (selectedBlueRadioButton == null) {
-                        // If no button is selected, set the default button here
-                        chosenCharacter = '*';
-                    }
-                    else{
-                        chosenCharacter = selectedBlueRadioButton.getText().charAt(0);
-                    }
-                }
-
-                if (chosenCharacter == 'C'){
-                    makeComputerMove();
-                }
-                else{
+                
+                if (redPlayerMode != 'C' && bluePlayerMode == 'C') { // Blue is computer, red is human
                     button.setOnAction(event -> {
-                        if (player[0] % 2 == 0) {
+                        // Red player's move
+                        RadioButton selectedRadioButton = (RadioButton) redToggleGroup.getSelectedToggle();
+                        chosenCharacter = selectedRadioButton.getText().charAt(0);
+                        
+                        if (game.placeSOrO(row, col, chosenCharacter, recordGame)) {
+                            button.setText(String.valueOf(chosenCharacter));
+                            button.setTextFill(Color.RED);
+                            errorLabel.setText(""); // Clear error message
+                            if (recordGame) {
+                                try {
+                                    FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                                    writer.write("Red" + "\n");
+                                    writer.close();
+                                } catch (IOException e) {
+                                    e.printStackTrace();
+                                    // Handle IOException if necessary
+                                }
+                            }
                             
-                            chosenCharacter = selectedRedRadioButton.getText().charAt(0);
+                            // Check if the game is over after red player's move
+                            if (game.isGameOver(row, col, isSimpleGame)) {
+                                // Determine the winner or if it's a tie
+                                if (game.getRedScore() > game.getBlueScore()) {
+                                    errorLabel.setTextFill(Color.BLUE);
+                                    errorLabel.setText("Blue Player is the Winner!"); // Red winner
+                                } else if (game.getBlueScore() > game.getRedScore()) {
+                                    errorLabel.setText("Red Player is the Winner!"); // Blue winner
+                                } else {
+                                    errorLabel.setTextFill(Color.PURPLE);
+                                    errorLabel.setText("It's a tie!"); // Tie
+                                }
+                                return;
+                            }
+                            
+                            // Blue player's turn (computer move)
+                            makeComputerMove("Blue");
+                            //player[0]++; // Increment the player count
+                            
+                        } else {
+                            errorLabel.setText("Position already occupied. Please try again.");
                         }
-                        else {
-                            chosenCharacter = selectedBlueRadioButton.getText().charAt(0);
-                        }
-                        if (game.placeSOrO(row[0], col[0], chosenCharacter)) { 
+                    });
+                }
+
+                if(redPlayerMode == 'C' && bluePlayerMode != 'C' ){ // red is computer, blue is human
+                    button.setOnAction(event -> {
+                        RadioButton selectedRadioButton = (RadioButton) blueToggleGroup.getSelectedToggle();
+                        chosenCharacter = selectedRadioButton.getText().charAt(0);
+
+                        if (game.placeSOrO(row, col, chosenCharacter, recordGame)) {
                             button.setText(String.valueOf(chosenCharacter));
                             if (player[0] % 2 == 0) { //changes color for each player
                                 button.setTextFill(Color.RED);
+                                if (recordGame) {
+                                    try {
+                                        FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                                        writer.write("Red" + "\n");
+                                        writer.close();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                        // Handle IOException if necessary
+                                    }
+                                }
                             } 
                             else {
                                 button.setTextFill(Color.BLUE);
+                                if (recordGame) {
+                                    try {
+                                        FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                                        writer.write("Blue" + "\n");
+                                        writer.close();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                        // Handle IOException if necessary
+                                    }
+                                }
                             }
                             errorLabel.setText(""); // Clear error message
-    
-                            if (game.isGameOver(row[0], col[0], isSimpleGame)){
+                            if (game.isGameOver(row, col, isSimpleGame)){
+                                if (game.getRedScore() > game.getBlueScore()){
+                                    errorLabel.setText("Red Player is the Winner!"); // red winner
+                                }
+                                else if (game.getBlueScore() > game.getRedScore()){
+                                    errorLabel.setTextFill(Color.BLUE);
+                                    errorLabel.setText("Blue Player is the Winner!"); // blue winner
+                                }
+                                else {
+                                    errorLabel.setTextFill(Color.PURPLE);
+                                    errorLabel.setText("It's a tie!"); // tie
+                                }
+                                return;
+                            }
+                            player[0]++; // Increment the value inside the array
+                            // Automatically make the computer (red player) move after blue player's move
+                            if (player[0] % 2 == 0) {
+                                makeComputerMove("Red");
+                                player[0]++;
+                            }
+                            
+                        } else {
+                            errorLabel.setText("Position already occupied. Please try again.");
+                        }
+                    });
+                }
+
+                if(redPlayerMode != 'C' && bluePlayerMode != 'C'){ // both human
+                    button.setOnAction(event -> {
+                        if (player[0] % 2 == 0) {
+                            RadioButton selectedRadioButton = (RadioButton) redToggleGroup.getSelectedToggle();
+                            chosenCharacter = selectedRadioButton.getText().charAt(0);
+                        } else {
+                            RadioButton selectedRadioButton = (RadioButton) blueToggleGroup.getSelectedToggle();
+                            chosenCharacter = selectedRadioButton.getText().charAt(0);
+                        }
+                        if (game.placeSOrO(row, col, chosenCharacter, recordGame)) {
+                            button.setText(String.valueOf(chosenCharacter));
+                            if (player[0] % 2 == 0) { //changes color for each player
+                                button.setTextFill(Color.RED);
+                                if (recordGame) {
+                                    try {
+                                        FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                                        writer.write("Red" + "\n");
+                                        writer.close();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                        // Handle IOException if necessary
+                                    }
+                                }
+                            } 
+                            else {
+                                button.setTextFill(Color.BLUE);
+                                if (recordGame) {
+                                    try {
+                                        FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                                        writer.write("Blue" + "\n");
+                                        writer.close();
+                                    } catch (IOException e) {
+                                        e.printStackTrace();
+                                        // Handle IOException if necessary
+                                    }
+                                }
+                            }
+                            errorLabel.setText(""); // Clear error message
+                            if (game.isGameOver(row, col, isSimpleGame)){
                                 if (game.getRedScore() > game.getBlueScore()){
                                     errorLabel.setText("Red Player is the Winner!"); // red winner
                                 }
@@ -210,11 +342,59 @@ public class App extends Application {
                         }
                     });
                 }
+                
+                if (bluePlayerMode == 'C' && redPlayerMode == 'C' ) { // both computer
+                    if (game.isGameOver(row, col, isSimpleGame)) {
+                        // Determine the winner or if it's a tie
+                        if (game.getRedScore() > game.getBlueScore()) {
+                            errorLabel.setText("Red Player is the Winner!"); // Red winner
+                        } else if (game.getBlueScore() > game.getRedScore()) {
+                            errorLabel.setTextFill(Color.BLUE);
+                            errorLabel.setText("Blue Player is the Winner!"); // Blue winner
+                        } else {
+                            errorLabel.setTextFill(Color.PURPLE);
+                            errorLabel.setText("It's a tie!"); // Tie
+                        }
+                        break;
+                    }
+                    makeComputerMove("Blue");
+                    // Check if the game is over after red player's move
+                    if (game.isGameOver(row, col, isSimpleGame)) {
+                        // Determine the winner or if it's a tie
+                        if (game.getRedScore() > game.getBlueScore()) {
+                            errorLabel.setText("Red Player is the Winner!"); // Red winner
+                        } else if (game.getBlueScore() > game.getRedScore()) {
+                            errorLabel.setTextFill(Color.BLUE);
+                            errorLabel.setText("Blue Player is the Winner!"); // Blue winner
+                        } else {
+                            errorLabel.setTextFill(Color.PURPLE);
+                            errorLabel.setText("It's a tie!"); // Tie
+                        }
+                        break;
+                    }
+                    makeComputerMove("Red");
+                    if (game.isGameOver(row, col, isSimpleGame)) {
+                        // Determine the winner or if it's a tie
+                        if (game.getRedScore() > game.getBlueScore()) {
+                            errorLabel.setText("Red Player is the Winner!"); // Red winner
+                        } else if (game.getBlueScore() > game.getRedScore()) {
+                            errorLabel.setTextFill(Color.BLUE);
+                            errorLabel.setText("Blue Player is the Winner!"); // Blue winner
+                        } else {
+                            errorLabel.setTextFill(Color.PURPLE);
+                            errorLabel.setText("It's a tie!"); // Tie
+                        }
+                        break;
+                    }
+                } 
+
 
                 buttons[i][j] = button;
                 gridPane.add(button, j, i);
             }
         }
+
+        
     
         // Create radio buttons for character selection
         RadioButton blueSRadioButton = new RadioButton("S");
@@ -254,7 +434,7 @@ public class App extends Application {
         // Layout game board, character selection, and error label
         VBox root = new VBox(10);
         root.setAlignment(Pos.CENTER);
-        root.getChildren().addAll(gameBoardAndSelectionBox, errorLabel, createRestartButton(primaryStage));
+        root.getChildren().addAll(gameBoardAndSelectionBox, errorLabel, createReplayButton(), createRestartButton(primaryStage));
 
         int height = 75 * boardSize;
         int width = 125 * boardSize;
@@ -271,32 +451,76 @@ public class App extends Application {
         return true;
     }
     
-    // Method to create the start and restart button
-    private Button createRestartButton(Stage primaryStage) {
-        // If game hasn't started yet, create a start button
-        if (startButton == null) {
-            startButton = new Button("Start Game");
-            startButton.setOnAction(event -> {
-                boolean gameStarted = startGame(primaryStage);
-                if (!gameStarted) {
-                    check++;
-                    start(primaryStage);
-                } else {
-                    // Change button text to "Restart Game" after game has started
-                    startButton.setText("Restart Game");
-                }
-            });
-            return startButton;
-        } else {
-            // If game has started, create a restart button
-            Button restartButton = new Button("Restart Game");
-            restartButton.setOnAction(event -> start(primaryStage));
-            return restartButton;
+     // Method to create the restart button
+     private Button createRestartButton(Stage primaryStage) {
+        Button restartButton = new Button("Restart Game");
+        restartButton.setOnAction(event -> start(primaryStage));
+        return restartButton;
+    }
+
+    // Method to clear the board
+    private void clearBoard() {
+        for (int i = 0; i < game.getSize(); i++) {
+            for (int j = 0; j < game.getSize(); j++) {
+                buttons[i][j].setText("*");
+                buttons[i][j].setTextFill(Color.BLACK);
+            }
         }
     }
 
 
-    private void makeComputerMove() {
+    // Method to replay moves from the text file
+    private void replayMovesFromFile() {
+        try {
+            BufferedReader reader = new BufferedReader(new FileReader("successful_moves.txt"));
+            String line;
+            while ((line = reader.readLine()) != null) {
+                // Skip empty lines
+                if (line.isEmpty()) {
+                    continue;
+                }
+                
+                // Parse the line to get row, column, symbol, and color
+                String[] parts = line.split(", ");
+                int row = Integer.parseInt(parts[0].substring(5).trim()); // Extract row number
+                int col = Integer.parseInt(parts[1].substring(5).trim()); // Extract column number
+                char symbol = parts[2].substring(8).trim().charAt(0); // Extract symbol
+                String color = parts[3].substring(7).trim(); // Extract color
+                
+                // Update the corresponding button on the game board
+                buttons[row][col].setText(Character.toString(symbol));
+                if("Blue".equals(color)){
+                    buttons[row][col].setTextFill(Color.BLUE);
+                }
+                else {
+                    buttons[row][col].setTextFill(Color.RED);
+                }
+                
+                
+                Thread.sleep(1000); // Adjust the delay time as needed
+            }
+            reader.close();
+        } catch (IOException | InterruptedException | NumberFormatException e) {
+            e.printStackTrace();
+            // Handle exceptions if necessary
+        }
+    }
+
+
+
+
+    // Method to create the replay button
+    private Button createReplayButton() {
+        Button replayButton = new Button("Replay");
+        replayButton.setOnAction(event -> {
+            clearBoard(); // Clear the board
+            replayMovesFromFile(); // Replay moves from the text file
+        });
+        return replayButton;
+    }
+
+
+    private void makeComputerMove(String color) {
         // Create an instance of the Random class
         Random random = new Random();
 
@@ -317,9 +541,37 @@ public class App extends Application {
         chosenCharacter = (randomNumber == 0) ? 'S' : 'O';
 
         // Place the chosen character 
-        game.placeSOrO(row, col, chosenCharacter);
-        buttons[row][col].setText(String.valueOf(chosenCharacter));
-        buttons[row][col].setTextFill(Color.RED);
+        game.placeSOrO(row, col, chosenCharacter, recordGame);
+        
+        if ("Red".equals(color)){
+            buttons[row][col].setTextFill(Color.RED);
+            buttons[row][col].setText(String.valueOf(chosenCharacter));
+            if (recordGame) {
+                try {
+                    FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                    writer.write(color + "\n");
+                    writer.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // Handle IOException if necessary
+                }
+            }
+        }
+        else {
+            buttons[row][col].setTextFill(Color.BLUE);
+            buttons[row][col].setText(String.valueOf(chosenCharacter));
+            if (recordGame) {
+                try {
+                    FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                    writer.write(color + "\n");
+                    writer.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // Handle IOException if necessary
+                }
+            }
+        }
+        
     }
 
     public static void main(String[] args) {

@@ -1,6 +1,8 @@
 package com.sos;
 
 import javafx.scene.control.Label;
+import java.io.FileWriter;
+import java.io.IOException;
 
 
 public class SOSGame {
@@ -62,6 +64,7 @@ public class SOSGame {
     }
 
     private void initializeBoard(int size) {
+        clearSuccessfulMovesFile();
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 board[i][j] = new SOSMove('*','*'); // Initialize with an empty SOSMove instance
@@ -77,7 +80,7 @@ public class SOSGame {
     }
     
 
-    public boolean placeSOrO(int row, int col, char symbol) {
+    public boolean placeSOrO(int row, int col, char symbol, boolean recordGame) {
         if (row < 0 || row >= size || col < 0 || col >= size) {
             return false; // Invalid move
         }
@@ -85,6 +88,18 @@ public class SOSGame {
             board[row][col].moveSymbol = symbol;
             board[row][col].currentPlayerSymbol = currentPlayerSymbol;
             currentPlayerSymbol = (currentPlayerSymbol == 'B') ? 'R' : 'B';
+            // Write successful move to a text file only if recordGame is true
+            if (recordGame) {
+                try {
+                    FileWriter writer = new FileWriter("successful_moves.txt", true); // Append mode
+                    writer.write("Row: " + row + ", Col: " + col + ", Symbol: " + symbol + ", Color: ");
+                    writer.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    // Handle IOException if necessary
+                }
+            }
+            
             return true; // Valid move
         } 
         else {
@@ -154,14 +169,16 @@ public class SOSGame {
             return true; 
         }
         else {
-            if (isSimpleGame) {
-                return redScore > 0 || blueScore > 0;
+            if (isSimpleGame && (redScore > 0 || blueScore > 0)) {
+                return true;
             } 
             else {
                 return false;
             }
         }        
     }
+
+    
     
     private void updateScores(int row, int col) {
         if (board[row][col].currentPlayerSymbol == 'R') {
@@ -186,6 +203,16 @@ public class SOSGame {
         return true; // Board is full, no empty cells found
     }
     
+    public void clearSuccessfulMovesFile() {
+        try {
+            FileWriter writer = new FileWriter("successful_moves.txt", false); // Overwrite mode
+            writer.write(""); // Write empty string to clear the file
+            writer.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+            // Handle IOException if necessary
+        }
+    }
 
     public int getRedScore() {
         return redScore;
